@@ -21,10 +21,16 @@ import tf
 
 MIN_POINTS = 100
 
-min_range_ = 3
-min_range_z2_ = 12.3625
-min_range_z3_ = 22.025
-min_range_z4_ = 41.35
+# min_range_ = 3
+# min_range_z2_ = 12.3625
+# min_range_z3_ = 22.025
+# min_range_z4_ = 41.35
+# max_range_ = 100.0
+
+min_range_ = 4
+min_range_z2_ = 10
+min_range_z3_ = 22
+min_range_z4_ = 40
 max_range_ = 100.0
 
 min_ranges_   = [min_range_, min_range_z2_, min_range_z3_, min_range_z4_]
@@ -37,8 +43,8 @@ sector_const = 32
 # min_ranges_each_zone = [2.7, 12.3625, 22.025, 41.35]
 
 num_zones = 4
-num_sectors_each_zone = [16, 32 ,54, 32]
-num_rings_each_zone = [2, 4, 4, 4]
+num_sectors_each_zone = [48, 36 ,48, 64]
+num_rings_each_zone = [2, 2, 3, 4]
 
 ring_sizes_   = [(min_range_z2_ - min_range_) / num_rings_each_zone[0],
                          (min_range_z3_ - min_range_z2_) / num_rings_each_zone[1],
@@ -62,6 +68,9 @@ TOO_TILTED = 1. # red
 
 # Define the color for each layer
 layer_colors = [(255, 0, 0), (255, 165, 0), (0, 255, 0), (0, 0, 255)] # Red, Orange, Green, Blue
+# cluster_colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0), (1.0, 1.0, 1.0, 1.0) ] # Red, Green, Blue
+# cluster_likelihoods = [0.55, 0.2, 1.0, 0.0] 
+
 cluster_colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0)] # Red, Green, Blue
 cluster_likelihoods = [0.55, 0.2, 1.0] 
 
@@ -115,7 +124,7 @@ def get_likelihood_for_label(label):
         return 0.0  # for safety, in case an unexpected label value appears
 
 
-def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, sector_size, min_range, color):
+def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, sector_size, min_range):
     # assert len(cluster_colors) == len(cluster_likelihoods), "Number of colors must match number of likelihoods"
     polygon_stamped = PolygonStamped()
     polygon_stamped.header = cloud_msg.header
@@ -161,7 +170,7 @@ def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, se
                         z = MARKER_Z_VALUE)
         polygon_stamped.polygon.points.append(point)
 
-    return polygon_stamped, std_msgs.msg.ColorRGBA(color[0], color[1], color[2], color[3])
+    return polygon_stamped
 
 all_image_vectors = []
 
@@ -182,32 +191,71 @@ def cloud_cb(cloud_msg):
         r = xy2radius(x, y)
         if r <= max_range_ and r > min_range_:
             theta = xy2theta(x, y)
-            ring_idx = sector_idx = 0
+            zone_idx = ring_idx = sector_idx = 0
 
             if r < min_range_z2_:
+                zone_idx = 0
                 ring_idx   = min(int((r - min_range_) / ring_sizes_[0]), num_rings_each_zone[0]-1)
                 sector_idx = min(int(theta / sector_sizes_[0]), num_sectors_each_zone[0]-1)
-                czm[0][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[0]])
+                czm[zone_idx][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[0]])
             elif r < min_range_z3_:
+                zone_idx = 1
                 ring_idx   = min(int((r - min_range_z2_) / ring_sizes_[1]), num_rings_each_zone[1]-1)
                 sector_idx = min(int(theta / sector_sizes_[1]), num_sectors_each_zone[1]-1)
-                czm[1][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[1]])
+                czm[zone_idx][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[1]])
             elif r < min_range_z4_:
+                zone_idx = 2
                 ring_idx   = min(int((r - min_range_z3_) / ring_sizes_[2]), num_rings_each_zone[2]-1)
                 sector_idx = min(int(theta / sector_sizes_[2]), num_sectors_each_zone[2]-1)
-                czm[2][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[2]])
+                czm[zone_idx][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[2]])
             else:
+                zone_idx = 3
                 ring_idx   = min(int((r - min_range_z4_) / ring_sizes_[3]), num_rings_each_zone[3]-1)
                 sector_idx = min(int(theta / sector_sizes_[3]), num_sectors_each_zone[3]-1)
-                czm[3][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[3]])
+                czm[zone_idx][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[3]])
 
     all_points = []
+    ring_max_points_counts = []
+
     for layer in czm:
         for ring in layer:
             for sector in ring:
                 if len(sector.points) > MIN_POINTS:
                     all_points.extend(sector.points)
+                    # sector_points_counts.append(len(sector.points))
 
+    # print("Sector points counts:")
+    # print(sector_points_counts)
+
+
+    for layer in czm:
+        for ring in layer:
+            max_points_in_ring = max((len(sector.points) for sector in ring if len(sector.points) > MIN_POINTS), default=0)
+            ring_max_points_counts.append(max_points_in_ring)
+
+
+    # Now calculate the mean and variance of the array
+    ring_max_points_counts = np.array(ring_max_points_counts)
+    non_zero_ring_max_points_counts = ring_max_points_counts[ring_max_points_counts != 0]
+
+    # 이제 non_zero_ring_max_points_counts에는 0을 제외한 값들만 있습니다.
+    average = np.mean(non_zero_ring_max_points_counts)
+    std_dev = np.std(non_zero_ring_max_points_counts)
+
+    print(non_zero_ring_max_points_counts)
+    print("Mean of maximum points in each ring: ", average)
+    print("Standard deviation of maximum points in each ring: ", std_dev)
+
+    # sector_points_counts = np.array(sector_points_counts)
+    # mean = np.mean(sector_points_counts)
+    # std_dev = np.std(sector_points_counts)
+    # min_val = np.min(sector_points_counts)
+    # max_val = np.max(sector_points_counts)
+
+    # print("Mean of sector points counts: ", mean)
+    # print("Standard deviation of sector points counts: ", std_dev)
+    # print("Minimum of sector points counts: ", min_val)
+    # print("Maximum of sector points counts: ", max_val)
 
     z_values = [pt[2] for pt in all_points]
     min_z = min(z_values)
@@ -217,7 +265,7 @@ def cloud_cb(cloud_msg):
     polygon_msg = PolygonArray()
     polygon_msg.header = cloud_msg.header
 
-    colors = []
+    images = []
 
     img_dim = 15 # The dimension (in pixels) of your output images
     for zone_idx, layer in enumerate(czm):
@@ -242,19 +290,25 @@ def cloud_cb(cloud_msg):
 
                         image[normalized_y, normalized_x] = normalized_z
 
+                    cv2.imwrite('heightmaps_30/layer{}_ring{}_sector{}.png'.format(zone_idx, ring_idx, sector_idx), image)
+
+                    image = np.array(image).flatten()
+                    images.append(image)
                     # Store the image vector
                     image_vector = image.reshape(-1, 1)
                     all_image_vectors.append(image_vector)
-
-                    # cv2.imwrite('heightmaps_30/layer{}_ring{}_sector{}.png'.format(zone_idx, ring_idx, sector_idx), image)
+   
 
     # Once all images have been processed, perform clustering
     scaler = StandardScaler()
-    all_image_vectors_scaled = scaler.fit_transform(np.concatenate(all_image_vectors))
+    images = scaler.fit_transform(images)
+    # all_image_vectors_scaled = scaler.fit_transform(np.concatenate(all_image_vectors))
 
-    kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(all_image_vectors_scaled)
+    # kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(all_image_vectors_scaled)
+    kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(images)
     all_labels = kmeans.labels_
-    print(all_labels)
+    # print(all_labels)
+    print(len(all_labels))
 
     # Iterate over the zones, rings, and sectors again to assign the labels
     label_idx = 0
@@ -265,18 +319,19 @@ def cloud_cb(cloud_msg):
                     cluster_label = all_labels[label_idx]
 
                     #polygon 
-                    polygon_stamped, color = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_, color=cluster_colors[cluster_label])
+                    polygon_stamped = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_)
                     polygon_msg.polygons.append(polygon_stamped)
-                    colors.append(color)
 
                     # Add likelihood to the polygon label
                     polygon_msg.likelihood.append(get_likelihood_for_label(cluster_label))
 
                     sector.points = [[pt[0], pt[1], pt[2], pt[3], cluster_colors[cluster_label]] for pt in sector.points]
                     label_idx += 1
-    poly_pub.publish(polygon_msg)
+    
+    # print("The length of Cluster_label : "+len(cluster_label))
+    # print("The length of label_idx : "+len(label_idx))
 
-    # print("Zone 1, Ring 1, Sector Indices: ", sector_indices)  # 각 호출에서의 sector_indices 리스트 출력
+    poly_pub.publish(polygon_msg)
 
     if all_points:
         output = pc2.create_cloud(cloud_msg.header, fields, [(pt[0], pt[1], pt[2], rgb_to_float(pt[4])) for pt in all_points])
