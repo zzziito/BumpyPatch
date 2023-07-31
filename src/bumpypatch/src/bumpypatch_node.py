@@ -14,6 +14,7 @@ import cv2
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import std_msgs
+import tf
 
 ### DEFINE CONSTANTS ###
 
@@ -54,10 +55,15 @@ sector_sizes_ = [2 * math.pi / num_sectors_each_zone[0],
 N_CLUSTERS = 3
 kmeans = KMeans(n_clusters=N_CLUSTERS)
 
+UPRIGHT_ENOUGH  = 0.55 # cyan
+FLAT_ENOUGH = 0.2  # green
+TOO_HIGH_ELEVATION = 0.0 # blue
+TOO_TILTED = 1. # red
 
 # Define the color for each layer
 layer_colors = [(255, 0, 0), (255, 165, 0), (0, 255, 0), (0, 0, 255)] # Red, Orange, Green, Blue
 cluster_colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0)] # Red, Green, Blue
+cluster_likelihoods = [0.55, 0.2, 1.0] 
 
 fields = [pc2.PointField('x', 0, pc2.PointField.FLOAT32, 1),
           pc2.PointField('y', 4, pc2.PointField.FLOAT32, 1),
@@ -95,7 +101,22 @@ def rgb_to_float(color):
     hex_color = 0x0000 | (int(color[0]) << 16) | (int(color[1]) << 8) | int(color[2])
     return struct.unpack('f', struct.pack('I', hex_color))[0]
 
+def get_likelihood_for_label(label):
+    # According to the label value, return the corresponding likelihood
+    if label == 0:
+        return UPRIGHT_ENOUGH  # cyan
+    elif label == 1:
+        return FLAT_ENOUGH  # green
+    elif label == 2:
+        return TOO_HIGH_ELEVATION  # blue
+    elif label == 3:
+        return TOO_TILTED  # red
+    else:
+        return 0.0  # for safety, in case an unexpected label value appears
+
+
 def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, sector_size, min_range, color):
+    # assert len(cluster_colors) == len(cluster_likelihoods), "Number of colors must match number of likelihoods"
     polygon_stamped = PolygonStamped()
     polygon_stamped.header = cloud_msg.header
 
@@ -142,14 +163,9 @@ def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, se
 
     return polygon_stamped, std_msgs.msg.ColorRGBA(color[0], color[1], color[2], color[3])
 
-previous_sector_idx = -1
-sector_indices = []  # 새로운 섹터 인덱스를 저장할 리스트
-# Create an empty list to store all image vectors
 all_image_vectors = []
 
 def cloud_cb(cloud_msg):
-    global previous_sector_idx
-    global sector_indices  
 
     cloud = pc2.read_points(cloud_msg, field_names=("x", "y", "z", "intensity"), skip_nans=True)
     # czm = [Zone() for _ in range(4*16)] # for 4 rings and 16 sectors
@@ -158,6 +174,7 @@ def cloud_cb(cloud_msg):
         [Zone() for _ in range(num_sectors_each_zone[zone_idx])]
         for _ in range(num_rings_each_zone[zone_idx])
     ] for zone_idx in range(num_zones)]
+    # czm = np.random.rand(num_zones, num_rings, num_sectors, 5)
 
 
     for pt in cloud:
@@ -237,6 +254,7 @@ def cloud_cb(cloud_msg):
 
     kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(all_image_vectors_scaled)
     all_labels = kmeans.labels_
+    print(all_labels)
 
     # Iterate over the zones, rings, and sectors again to assign the labels
     label_idx = 0
@@ -251,13 +269,14 @@ def cloud_cb(cloud_msg):
                     polygon_msg.polygons.append(polygon_stamped)
                     colors.append(color)
 
+                    # Add likelihood to the polygon label
+                    polygon_msg.likelihood.append(get_likelihood_for_label(cluster_label))
+
                     sector.points = [[pt[0], pt[1], pt[2], pt[3], cluster_colors[cluster_label]] for pt in sector.points]
                     label_idx += 1
-                    
-    polygon_msg.colors = colors
     poly_pub.publish(polygon_msg)
 
-    print("Zone 1, Ring 1, Sector Indices: ", sector_indices)  # 각 호출에서의 sector_indices 리스트 출력
+    # print("Zone 1, Ring 1, Sector Indices: ", sector_indices)  # 각 호출에서의 sector_indices 리스트 출력
 
     if all_points:
         output = pc2.create_cloud(cloud_msg.header, fields, [(pt[0], pt[1], pt[2], rgb_to_float(pt[4])) for pt in all_points])
