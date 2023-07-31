@@ -1,0 +1,61 @@
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/rtlink/jiwon/paper_ws/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_fd6ce/fast && /usr/bin/make  -f CMakeFiles/cmTC_fd6ce.dir/build.make CMakeFiles/cmTC_fd6ce.dir/build
+make[1]: 디렉터리 '/home/rtlink/jiwon/paper_ws/build/CMakeFiles/CMakeTmp' 들어감
+Building C object CMakeFiles/cmTC_fd6ce.dir/src.c.o
+/home/rtlink/anaconda3/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_fd6ce.dir/src.c.o -c /home/rtlink/jiwon/paper_ws/build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_fd6ce
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fd6ce.dir/link.txt --verbose=1
+/home/rtlink/anaconda3/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD -rdynamic CMakeFiles/cmTC_fd6ce.dir/src.c.o -o cmTC_fd6ce 
+/home/rtlink/anaconda3/bin/../lib/gcc/x86_64-conda-linux-gnu/12.1.0/../../../../x86_64-conda-linux-gnu/bin/ld: CMakeFiles/cmTC_fd6ce.dir/src.c.o: in function `main':
+src.c:(.text+0x2f): undefined reference to `pthread_create'
+/home/rtlink/anaconda3/bin/../lib/gcc/x86_64-conda-linux-gnu/12.1.0/../../../../x86_64-conda-linux-gnu/bin/ld: src.c:(.text+0x3b): undefined reference to `pthread_detach'
+/home/rtlink/anaconda3/bin/../lib/gcc/x86_64-conda-linux-gnu/12.1.0/../../../../x86_64-conda-linux-gnu/bin/ld: src.c:(.text+0x47): undefined reference to `pthread_cancel'
+/home/rtlink/anaconda3/bin/../lib/gcc/x86_64-conda-linux-gnu/12.1.0/../../../../x86_64-conda-linux-gnu/bin/ld: src.c:(.text+0x58): undefined reference to `pthread_join'
+/home/rtlink/anaconda3/bin/../lib/gcc/x86_64-conda-linux-gnu/12.1.0/../../../../x86_64-conda-linux-gnu/bin/ld: src.c:(.text+0x6c): undefined reference to `pthread_atfork'
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_fd6ce.dir/build.make:106: cmTC_fd6ce] 오류 1
+make[1]: 디렉터리 '/home/rtlink/jiwon/paper_ws/build/CMakeFiles/CMakeTmp' 나감
+make: *** [Makefile:140: cmTC_fd6ce/fast] 오류 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/rtlink/jiwon/paper_ws/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_5fdf7/fast && /usr/bin/make  -f CMakeFiles/cmTC_5fdf7.dir/build.make CMakeFiles/cmTC_5fdf7.dir/build
+make[1]: 디렉터리 '/home/rtlink/jiwon/paper_ws/build/CMakeFiles/CMakeTmp' 들어감
+Building C object CMakeFiles/cmTC_5fdf7.dir/CheckFunctionExists.c.o
+/home/rtlink/anaconda3/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_5fdf7.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_5fdf7
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5fdf7.dir/link.txt --verbose=1
+/home/rtlink/anaconda3/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create -rdynamic CMakeFiles/cmTC_5fdf7.dir/CheckFunctionExists.c.o -o cmTC_5fdf7  -lpthreads 
+/home/rtlink/anaconda3/bin/../lib/gcc/x86_64-conda-linux-gnu/12.1.0/../../../../x86_64-conda-linux-gnu/bin/ld: cannot find -lpthreads: 그런 파일이나 디렉터리가 없습니다
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_5fdf7.dir/build.make:106: cmTC_5fdf7] 오류 1
+make[1]: 디렉터리 '/home/rtlink/jiwon/paper_ws/build/CMakeFiles/CMakeTmp' 나감
+make: *** [Makefile:140: cmTC_5fdf7/fast] 오류 2
+
+
+

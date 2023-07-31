@@ -1,0 +1,4 @@
+# SaveImage.srv
+---
+bool success   # if the image was saved successfully
+string message # information about what happened
