@@ -13,6 +13,9 @@ from PIL import Image
 import cv2
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from visualization_msgs.msg import Marker
+from tf.transformations import quaternion_from_euler
 import std_msgs
 import tf
 
@@ -86,6 +89,7 @@ fields = [pc2.PointField('x', 0, pc2.PointField.FLOAT32, 1),
 
 pub = rospy.Publisher('output', PointCloud2, queue_size=1)
 poly_pub = rospy.Publisher('polygons', PolygonArray, queue_size=1)
+marker_pub = rospy.Publisher('normal_vector_marker', Marker, queue_size=10)
 
 
 ### CLASS FOR CZM ###
@@ -94,6 +98,8 @@ poly_pub = rospy.Publisher('polygons', PolygonArray, queue_size=1)
 class Zone:
     def __init__(self):
         self.points = []
+
+### czm 을 위한 함수
 
 def xy2radius(x, y):
     return np.sqrt(x**2 + y**2)
@@ -109,6 +115,8 @@ def rgb_to_float(color):
     """ Converts 8-bit RGB values to a single floating-point number. """
     hex_color = 0x0000 | (int(color[0]) << 16) | (int(color[1]) << 8) | int(color[2])
     return struct.unpack('f', struct.pack('I', hex_color))[0]
+
+### jsk_msgs polygon 의 likelihood 에 따라 색상 visualize
 
 def get_likelihood_for_label(label):
     # According to the label value, return the corresponding likelihood
@@ -174,6 +182,67 @@ def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, se
 
 all_image_vectors = []
 
+### sector 별 normal vector
+
+def calculate_normal_vector(points):
+    pca = PCA(n_components=3)
+    pca.fit(points)
+    normal_vector = pca.components_[-1]  # The normal vector is the eigenvector with the smallest eigenvalue
+
+    normal_vector = np.array(normal_vector)
+    angle_with_x_axis = np.arccos(np.dot(normal_vector, [1, 0, 0]))
+    angle_with_y_axis = np.arccos(np.dot(normal_vector, [0, 1, 0]))
+    angle_with_z_axis = np.arccos(np.dot(normal_vector, [0, 0, 1]))
+    normal_vector = [angle_with_x_axis, angle_with_y_axis, angle_with_z_axis]
+    print(normal_vector)
+    return normal_vector
+
+def normal_vector_to_msg(normal_vector, x, y, z, marker_id):
+    x = -x
+    y = -y
+
+    marker = Marker()
+    marker.header.frame_id = "base_link"  # Replace with the appropriate frame ID
+    marker.header.stamp = rospy.Time.now()
+    marker.ns = "normal_vectors"
+    marker.id = marker_id  # Unique ID for each marker
+    marker.type = Marker.ARROW
+    marker.action = Marker.ADD
+
+    # Set marker position to the center of the sector
+    marker.pose.position.x = x
+    marker.pose.position.y = y
+    marker.pose.position.z = 1
+
+    # Calculate the magnitude of the normal vector
+    magnitude = np.linalg.norm(normal_vector)
+
+    # Set the marker scale
+    marker.scale.x = magnitude  # Length of the arrow
+    marker.scale.y = 0.1      # Width of the arrow
+    marker.scale.z = 0.1       # Height of the arrow
+
+    quat = quaternion_from_euler(normal_vector[0], normal_vector[1], normal_vector[2])
+
+    # print("quaternion : " , quat)
+
+    # Set the orientation of the marker
+    marker.pose.orientation.x = quat[0]
+    marker.pose.orientation.y = quat[1]
+    marker.pose.orientation.z = quat[2]
+    marker.pose.orientation.w = quat[3]
+
+    # Set marker color and transparency
+    marker.color.a = 1.0
+    marker.color.r = 0.0
+    marker.color.g = 1.0
+    marker.color.b = 0.0
+
+    marker.lifetime = rospy.Duration()
+
+    return marker
+
+
 def cloud_cb(cloud_msg):
 
     cloud = pc2.read_points(cloud_msg, field_names=("x", "y", "z", "intensity"), skip_nans=True)
@@ -216,6 +285,7 @@ def cloud_cb(cloud_msg):
 
     all_points = []
     ring_max_points_counts = []
+    marker_id = 0
 
     for layer in czm:
         for ring in layer:
@@ -242,9 +312,9 @@ def cloud_cb(cloud_msg):
     average = np.mean(non_zero_ring_max_points_counts)
     std_dev = np.std(non_zero_ring_max_points_counts)
 
-    print(non_zero_ring_max_points_counts)
-    print("Mean of maximum points in each ring: ", average)
-    print("Standard deviation of maximum points in each ring: ", std_dev)
+    # print(non_zero_ring_max_points_counts)
+    # print("Mean of maximum points in each ring: ", average)
+    # print("Standard deviation of maximum points in each ring: ", std_dev)
 
     # sector_points_counts = np.array(sector_points_counts)
     # mean = np.mean(sector_points_counts)
@@ -308,7 +378,9 @@ def cloud_cb(cloud_msg):
     kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(images)
     all_labels = kmeans.labels_
     # print(all_labels)
-    print(len(all_labels))
+    # print(len(all_labels))
+
+    flag = 0
 
     # Iterate over the zones, rings, and sectors again to assign the labels
     label_idx = 0
@@ -325,8 +397,25 @@ def cloud_cb(cloud_msg):
                     # Add likelihood to the polygon label
                     polygon_msg.likelihood.append(get_likelihood_for_label(cluster_label))
 
-                    sector.points = [[pt[0], pt[1], pt[2], pt[3], cluster_colors[cluster_label]] for pt in sector.points]
+                    sector.points = [[pt[0], pt[1], pt[2], cluster_colors[cluster_label]] for pt in sector.points]
                     label_idx += 1
+                    
+                    #normal vector  
+                    points = np.array([pt[:3] for pt in sector.points])  # Use only the x, y, z coordinates
+                    normal_vector = calculate_normal_vector(points)
+
+                    # Calculate sector center
+                    sector_center_x = np.mean(points[:, 0])
+                    sector_center_y = np.mean(points[:, 1])
+                    sector_center_z = np.mean(points[:, 2])
+
+                    # Create marker for the normal vector
+                    marker = normal_vector_to_msg(normal_vector, sector_center_x, sector_center_y, sector_center_z, marker_id)
+                    marker_id += 1  # Increment the marker ID
+                    
+                    # Publish the Marker
+                    marker_pub.publish(marker)
+
     
     # print("The length of Cluster_label : "+len(cluster_label))
     # print("The length of label_idx : "+len(label_idx))

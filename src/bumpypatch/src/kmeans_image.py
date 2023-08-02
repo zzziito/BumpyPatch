@@ -24,7 +24,7 @@ scaler = StandardScaler()
 images = scaler.fit_transform(images)
 
 n_clusters = 3  # Set the number of clusters
-kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(images)
+kmeans = KMeans(n_clusters=n_clusters, random_state=0, init="random").fit(images)
 
 labels = kmeans.labels_
 
