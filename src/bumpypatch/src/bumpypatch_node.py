@@ -22,7 +22,7 @@ import tf
 ### DEFINE CONSTANTS ###
 
 
-MIN_POINTS = 50
+MIN_POINTS = 30
 
 # min_range_ = 3
 # min_range_z2_ = 12.3625
@@ -31,9 +31,9 @@ MIN_POINTS = 50
 # max_range_ = 100.0
 
 min_range_ = 4
-min_range_z2_ = 10
-min_range_z3_ = 22
-min_range_z4_ = 40
+min_range_z2_ = 12
+min_range_z3_ = 28
+min_range_z4_ = 60
 max_range_ = 100.0
 
 min_ranges_   = [min_range_, min_range_z2_, min_range_z3_, min_range_z4_]
@@ -46,8 +46,8 @@ sector_const = 32
 # min_ranges_each_zone = [2.7, 12.3625, 22.025, 41.35]
 
 num_zones = 4
-num_sectors_each_zone = [48, 36 ,48, 64]
-num_rings_each_zone = [2, 2, 3, 4]
+num_sectors_each_zone = [72, 48 ,48, 64]
+num_rings_each_zone = [4, 4, 5, 5]
 
 ring_sizes_   = [(min_range_z2_ - min_range_) / num_rings_each_zone[0],
                          (min_range_z3_ - min_range_z2_) / num_rings_each_zone[1],
@@ -146,7 +146,7 @@ def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, se
     polygon_stamped.header = cloud_msg.header
 
     # Set point of polygon. Start from RL and ccw
-    MARKER_Z_VALUE = 0.0 # You can modify this value
+    MARKER_Z_VALUE = -1.0 # You can modify this value
 
     # RL
     zone_min_range = min_range[zone_idx]
@@ -362,69 +362,6 @@ def cloud_cb(cloud_msg):
         for ring_idx, ring in enumerate(layer):
             for sector_idx, sector in enumerate(ring):
                 if len(sector.points) > MIN_POINTS:
-
-                    #heightmap
-                    image = np.zeros((img_dim, img_dim), dtype=np.uint8)
-
-                    # Normalize x, y coordinates to fit in the image dimensions
-                    x_values = [pt[0] for pt in sector.points]
-                    y_values = [pt[1] for pt in sector.points]
-                    z_values = [pt[2] for pt in sector.points]
-                    
-                    min_x, max_x = min(x_values), max(x_values)
-                    min_y, max_y = min(y_values), max(y_values)
-                    # min_z, max_z = min(z_values), max(z_values)
-
-                    for pt in sector.points:
-                        normalized_x = int((pt[0] - min_x) / (max_x - min_x) * (img_dim - 1))
-                        normalized_y = int((pt[1] - min_y) / (max_y - min_y) * (img_dim - 1))
-                        normalized_z = int((pt[2] - min_z) / (max_z - min_z) * 255)
-
-                        image[normalized_y, normalized_x] = normalized_z
-
-                    # cv2.imwrite('heightmaps_30/layer{}_ring{}_sector{}.png'.format(zone_idx, ring_idx, sector_idx), image)
-
-                    image = np.array(image).flatten()
-                    images.append(image)
-                    # Store the image vector
-                    image_vector = image.reshape(-1, 1)
-                    all_image_vectors.append(image_vector)
-   
-
-    # Once all images have been processed, perform clustering
-    scaler = StandardScaler()
-    images = scaler.fit_transform(images)
-    # all_image_vectors_scaled = scaler.fit_transform(np.concatenate(all_image_vectors))
-
-    # kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(all_image_vectors_scaled)
-    kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(images)
-    all_labels = kmeans.labels_
-    # print(all_labels)
-    # print(len(all_labels))
-
-    cluster_to_avg_direction = {}
-    flag = 0
-
-    # Iterate over the zones, rings, and sectors again to assign the labels
-    label_idx = 0
-    for zone_idx, layer in enumerate(czm):
-        for ring_idx, ring in enumerate(layer):
-            for sector_idx, sector in enumerate(ring):
-                # if flag == 0:
-                if len(sector.points) > MIN_POINTS:
-                    # flag = 1
-                    cluster_label = all_labels[label_idx]
-
-                    #polygon 
-                    polygon_stamped = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_)
-                    polygon_msg.polygons.append(polygon_stamped)
-
-                    # Add likelihood to the polygon label
-                    polygon_msg.likelihood.append(get_likelihood_for_label(cluster_label))
-
-                    # sector.points = [[pt[0], pt[1], pt[2], cluster_colors[cluster_label]] for pt in sector.points]
-                    label_idx += 1
-                    
                     #normal vector  
                     points = np.array([pt[:3] for pt in sector.points])  # Use only the x, y, z coordinates
                     normal_vector = calculate_normal_vector(points)
@@ -453,6 +390,7 @@ def cloud_cb(cloud_msg):
 
                     # 3. In the loop where sectors are processed, add the following code:
                     if angle_with_z_axis(normal_vector) >= 1.1 and angle_with_z_axis(normal_vector) <= 1.9:
+
                         # print(angle_with_z_axis(normal_vector))
                         # This is a traversable sector, publish its points and polygon
                         traversable_points.extend(sector.points)
@@ -461,6 +399,73 @@ def cloud_cb(cloud_msg):
                         traversable_polygon_msg.polygons.append(traversable_polygon_stamped)
                         traversable_poly_pub.publish(traversable_polygon_msg)
                         traversable_poly_marker_pub.publish(marker)
+
+                        #heightmap
+                        image = np.zeros((img_dim, img_dim), dtype=np.uint8)
+
+                        # Normalize x, y coordinates to fit in the image dimensions
+                        x_values = [pt[0] for pt in sector.points]
+                        y_values = [pt[1] for pt in sector.points]
+                        z_values = [pt[2] for pt in sector.points]
+                        
+                        min_x, max_x = min(x_values), max(x_values)
+                        min_y, max_y = min(y_values), max(y_values)
+                        # min_z, max_z = min(z_values), max(z_values)
+
+                        for pt in sector.points:
+                            normalized_x = int((pt[0] - min_x) / (max_x - min_x) * (img_dim - 1))
+                            normalized_y = int((pt[1] - min_y) / (max_y - min_y) * (img_dim - 1))
+                            normalized_z = int((pt[2] - min_z) / (max_z - min_z) * 255)
+
+                            image[normalized_y, normalized_x] = normalized_z
+
+                        # cv2.imwrite('heightmaps_30/layer{}_ring{}_sector{}.png'.format(zone_idx, ring_idx, sector_idx), image)
+
+                        image = np.array(image).flatten()
+                        images.append(image)
+                        # Store the image vector
+                        image_vector = image.reshape(-1, 1)
+                        all_image_vectors.append(image_vector)
+   
+
+    # Once all images have been processed, perform clustering
+    scaler = StandardScaler()
+    images = scaler.fit_transform(images)
+    # all_image_vectors_scaled = scaler.fit_transform(np.concatenate(all_image_vectors))
+
+    # kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(all_image_vectors_scaled)
+    kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(images)
+    all_labels = kmeans.labels_
+    # print(all_labels)
+    # print(len(all_labels))
+
+    cluster_to_avg_direction = {}
+    flag = 0
+
+    # Iterate over the zones, rings, and sectors again to assign the labels
+    label_idx = 0
+    for zone_idx, layer in enumerate(czm):
+        for ring_idx, ring in enumerate(layer):
+            for sector_idx, sector in enumerate(ring):
+                # if flag == 0:
+                if len(sector.points) > MIN_POINTS:
+                    #normal vector  
+                    points = np.array([pt[:3] for pt in sector.points])  # Use only the x, y, z coordinates
+                    normal_vector = calculate_normal_vector(points)
+                    if angle_with_z_axis(normal_vector) >= 1.1 and angle_with_z_axis(normal_vector) <= 1.9:
+                        # flag = 1
+                        cluster_label = all_labels[label_idx]
+
+                        #polygon 
+                        polygon_stamped = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_)
+                        polygon_msg.polygons.append(polygon_stamped)
+
+                        # Add likelihood to the polygon label
+                        polygon_msg.likelihood.append(get_likelihood_for_label(cluster_label))
+
+                        # sector.points = [[pt[0], pt[1], pt[2], cluster_colors[cluster_label]] for pt in sector.points]
+                        label_idx += 1
+                    
                         
 
 
