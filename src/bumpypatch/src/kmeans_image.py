@@ -23,7 +23,7 @@ images, filenames = load_images_from_folder(folder)
 scaler = StandardScaler()
 images = scaler.fit_transform(images)
 
-n_clusters = 3  # Set the number of clusters
+n_clusters = 4  # Set the number of clusters
 kmeans = KMeans(n_clusters=n_clusters, random_state=0, init="random").fit(images)
 
 labels = kmeans.labels_

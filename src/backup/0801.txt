@@ -22,7 +22,7 @@ import tf
 ### DEFINE CONSTANTS ###
 
 
-MIN_POINTS = 50
+MIN_POINTS = 100
 
 # min_range_ = 3
 # min_range_z2_ = 12.3625
@@ -59,8 +59,6 @@ sector_sizes_ = [2 * math.pi / num_sectors_each_zone[0],
                  2 * math.pi / num_sectors_each_zone[2], 
                  2 * math.pi / num_sectors_each_zone[3]]
 
-angle_threshold = 2
-
 ### CLUSTERING ###
 
 N_CLUSTERS = 4
@@ -93,11 +91,6 @@ fields = [pc2.PointField('x', 0, pc2.PointField.FLOAT32, 1),
 pub = rospy.Publisher('output', PointCloud2, queue_size=1)
 poly_pub = rospy.Publisher('polygons', PolygonArray, queue_size=1)
 marker_pub = rospy.Publisher('normal_vector_marker', Marker, queue_size=10)
-
-traversable_pub = rospy.Publisher("traversable_sector", PointCloud2, queue_size=10)
-traversable_poly_pub = rospy.Publisher("traversable_sector_poly", PolygonArray, queue_size=10)
-traversable_poly_marker_pub = rospy.Publisher('traversable_sector_marker', Marker, queue_size=10)
-
 
 
 ### CLASS FOR CZM ###
@@ -202,7 +195,7 @@ def calculate_normal_vector(points):
     angle_with_y_axis = np.arccos(np.dot(normal_vector, [0, 1, 0]))
     angle_with_z_axis = np.arccos(np.dot(normal_vector, [0, 0, 1]))
     normal_vector = [angle_with_x_axis, angle_with_y_axis, angle_with_z_axis]
-    # print(normal_vector)
+    print(normal_vector)
     return normal_vector
 
 def normal_vector_to_msg(normal_vector, x, y, z, marker_id):
@@ -246,7 +239,7 @@ def normal_vector_to_msg(normal_vector, x, y, z, marker_id):
     marker.color.g = 1.0
     marker.color.b = 0.0
 
-    marker.lifetime = rospy.Duration(1)
+    marker.lifetime = rospy.Duration()
 
     return marker
 
@@ -254,8 +247,7 @@ def average_direction(vectors):
     return np.mean(vectors, axis=0)
 
 def angle_with_z_axis(vector):
-    vector = vector / np.linalg.norm(vector)
-    return np.arccos(np.dot(vector, [0, 0, -1]))
+    return np.arccos(np.dot(vector, [0, 0, 1]))
 
 ### callback function ###
 
@@ -300,7 +292,6 @@ def cloud_cb(cloud_msg):
                 czm[zone_idx][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[3]])
 
     all_points = []
-    traversable_points = []
     ring_max_points_counts = []
     marker_id = 0
 
@@ -315,10 +306,10 @@ def cloud_cb(cloud_msg):
     # print(sector_points_counts)
 
 
-    # for layer in czm:
-    #     for ring in layer:
-    #         max_points_in_ring = max((len(sector.points) for sector in ring if len(sector.points) > MIN_POINTS), default=0)
-    #         ring_max_points_counts.append(max_points_in_ring)
+    for layer in czm:
+        for ring in layer:
+            max_points_in_ring = max((len(sector.points) for sector in ring if len(sector.points) > MIN_POINTS), default=0)
+            ring_max_points_counts.append(max_points_in_ring)
 
 
     # Now calculate the mean and variance of the array
@@ -351,9 +342,6 @@ def cloud_cb(cloud_msg):
     # Prepare PolygonArray message
     polygon_msg = PolygonArray()
     polygon_msg.header = cloud_msg.header
-
-    traversable_polygon_msg = PolygonArray()
-    traversable_polygon_msg.header = cloud_msg.header
 
     images = []
 
@@ -403,16 +391,13 @@ def cloud_cb(cloud_msg):
     # print(len(all_labels))
 
     cluster_to_avg_direction = {}
-    flag = 0
 
     # Iterate over the zones, rings, and sectors again to assign the labels
     label_idx = 0
     for zone_idx, layer in enumerate(czm):
         for ring_idx, ring in enumerate(layer):
             for sector_idx, sector in enumerate(ring):
-                # if flag == 0:
                 if len(sector.points) > MIN_POINTS:
-                    # flag = 1
                     cluster_label = all_labels[label_idx]
 
                     #polygon 
@@ -422,19 +407,19 @@ def cloud_cb(cloud_msg):
                     # Add likelihood to the polygon label
                     polygon_msg.likelihood.append(get_likelihood_for_label(cluster_label))
 
-                    # sector.points = [[pt[0], pt[1], pt[2], cluster_colors[cluster_label]] for pt in sector.points]
+                    sector.points = [[pt[0], pt[1], pt[2], cluster_colors[cluster_label]] for pt in sector.points]
                     label_idx += 1
                     
                     #normal vector  
                     points = np.array([pt[:3] for pt in sector.points])  # Use only the x, y, z coordinates
                     normal_vector = calculate_normal_vector(points)
 
-                    # # If this is the first sector in this cluster, initialize the list of normal vectors
-                    # if cluster_label not in cluster_to_avg_direction:
-                    #     cluster_to_avg_direction[cluster_label] = []
+                    # If this is the first sector in this cluster, initialize the list of normal vectors
+                    if cluster_label not in cluster_to_avg_direction:
+                        cluster_to_avg_direction[cluster_label] = []
 
-                    # # Append the normal vector to the list of normal vectors for this cluster
-                    # cluster_to_avg_direction[cluster_label].append(normal_vector)
+                    # Append the normal vector to the list of normal vectors for this cluster
+                    cluster_to_avg_direction[cluster_label].append(normal_vector)
 
 
                     # Calculate sector center
@@ -448,35 +433,30 @@ def cloud_cb(cloud_msg):
                     
                     # Publish the Marker
                     marker_pub.publish(marker)
-                    # print(angle_with_z_axis(normal_vector))
-                    
 
-                    # 3. In the loop where sectors are processed, add the following code:
-                    if angle_with_z_axis(normal_vector) >= 1.1 and angle_with_z_axis(normal_vector) <= 1.9:
-                        # print(angle_with_z_axis(normal_vector))
-                        # This is a traversable sector, publish its points and polygon
-                        traversable_points.extend(sector.points)
+    # Calculate the average direction for each cluster
+    for cluster_label, normal_vectors in cluster_to_avg_direction.items():
+        avg_direction = average_direction(normal_vectors)
+        cluster_to_avg_direction[cluster_label] = avg_direction
 
-                        traversable_polygon_stamped = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_)
-                        traversable_polygon_msg.polygons.append(traversable_polygon_stamped)
-                        traversable_poly_pub.publish(traversable_polygon_msg)
-                        traversable_poly_marker_pub.publish(marker)
-                        
+    # Calculate the angles between the average directions and the z axis
+    cluster_to_angle_with_z_axis = {cluster_label: angle_with_z_axis(direction) for cluster_label, direction in cluster_to_avg_direction.items()}
 
+    # Sort the cluster labels by the angles in ascending order
+    sorted_cluster_labels = sorted(cluster_to_angle_with_z_axis, key=cluster_to_angle_with_z_axis.get)
 
+    # Assign the colors to the cluster labels based on the sorted order
+    for i, cluster_label in enumerate(sorted_cluster_labels):
+        cluster_colors[cluster_label] = cluster_colors[i % len(cluster_colors)]  # Repeat the colors if there are more clusters than colors
+    
     # print("The length of Cluster_label : "+len(cluster_label))
     # print("The length of label_idx : "+len(label_idx))
-
-
 
     poly_pub.publish(polygon_msg)
 
     if all_points:
         output = pc2.create_cloud(cloud_msg.header, fields, [(pt[0], pt[1], pt[2], rgb_to_float(pt[4])) for pt in all_points])
-        traversable_output = pc2.create_cloud(cloud_msg.header, fields, [(pt[0], pt[1], pt[2], rgb_to_float(pt[4])) for pt in traversable_points])
-
         pub.publish(output)
-        traversable_pub.publish(traversable_output)
 
 
 def listener():
