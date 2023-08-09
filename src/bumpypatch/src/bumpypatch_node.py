@@ -246,7 +246,7 @@ def normal_vector_to_msg(normal_vector, x, y, z, marker_id):
     marker.color.g = 1.0
     marker.color.b = 0.0
 
-    marker.lifetime = rospy.Duration(1)
+    marker.lifetime = rospy.Duration()
 
     return marker
 
