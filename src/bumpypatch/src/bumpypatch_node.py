@@ -24,12 +24,6 @@ import tf
 
 MIN_POINTS = 30
 
-# min_range_ = 3
-# min_range_z2_ = 12.3625
-# min_range_z3_ = 22.025
-# min_range_z4_ = 41.35
-# max_range_ = 100.0
-
 min_range_ = 4
 min_range_z2_ = 12
 min_range_z3_ = 28
@@ -40,14 +34,9 @@ min_ranges_   = [min_range_, min_range_z2_, min_range_z3_, min_range_z4_]
 
 sector_const = 32
 
-# num_zones = 4
-# num_sectors_each_zone = [sector_const, sector_const ,sector_const, sector_const]
-# num_rings_each_zone = [4, 4, 4, 4]
-# min_ranges_each_zone = [2.7, 12.3625, 22.025, 41.35]
-
 num_zones = 4
-num_sectors_each_zone = [72, 48 ,48, 64]
-num_rings_each_zone = [4, 4, 5, 5]
+num_sectors_each_zone = [36, 48 ,48, 32]
+num_rings_each_zone = [4, 4, 4, 5]
 
 ring_sizes_   = [(min_range_z2_ - min_range_) / num_rings_each_zone[0],
                          (min_range_z3_ - min_range_z2_) / num_rings_each_zone[1],
@@ -63,7 +52,7 @@ angle_threshold = 2
 
 ### CLUSTERING ###
 
-N_CLUSTERS = 4
+N_CLUSTERS = 3
 kmeans = KMeans(n_clusters=N_CLUSTERS)
 
 UPRIGHT_ENOUGH  = 0.55 # cyan
@@ -74,11 +63,11 @@ TOO_TILTED = 1. # red
 # Define the color for each layer
 layer_colors = [(255, 0, 0), (255, 165, 0), (0, 255, 0), (0, 0, 255)] # Red, Orange, Green, Blue
 
-cluster_colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 1.0, 1.0)  ] # Red, Green, Blue
-cluster_likelihoods = [0.55, 0.2, 1.0, 0.0] 
+# cluster_colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 1.0, 1.0)  ] # Red, Green, Blue
+# cluster_likelihoods = [0.55, 0.2, 1.0, 0.0] 
 
-# cluster_colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0)] # Red, Green, Blue
-# cluster_likelihoods = [0.55, 0.2, 1.0] 
+cluster_colors = [(0.0, 0.0, 1.0, 1.0), (0.0, 1.0, 0.0, 1.0), (1.0, 0.0, 1.0, 1.0)] # Blue, Green, Red
+cluster_likelihoods = [0.55, 0.2, 1.0] 
 
 fields = [pc2.PointField('x', 0, pc2.PointField.FLOAT32, 1),
           pc2.PointField('y', 4, pc2.PointField.FLOAT32, 1),
@@ -120,24 +109,35 @@ def xy2theta(x, y):
 
 
 def rgb_to_float(color):
-    """ Converts 8-bit RGB values to a single floating-point number. """
     hex_color = 0x0000 | (int(color[0]) << 16) | (int(color[1]) << 8) | int(color[2])
     return struct.unpack('f', struct.pack('I', hex_color))[0]
 
 ### jsk_msgs polygon 의 likelihood 에 따라 색상 visualize
 
+# def get_likelihood_for_label(label):
+#     # According to the label value, return the corresponding likelihood
+#     if label == 0:
+#         return UPRIGHT_ENOUGH  # cyan
+#     elif label == 1:
+#         return FLAT_ENOUGH  # green
+#     elif label == 2:
+#         return TOO_HIGH_ELEVATION  # blue
+#     elif label == 3:
+#         return TOO_TILTED  # red
+#     else:
+#         return 0.0  # for safety, in case an unexpected label value appears
+
 def get_likelihood_for_label(label):
     # According to the label value, return the corresponding likelihood
     if label == 0:
-        return UPRIGHT_ENOUGH  # cyan
+        return UPRIGHT_ENOUGH 
     elif label == 1:
-        return FLAT_ENOUGH  # green
+        return TOO_HIGH_ELEVATION  
     elif label == 2:
-        return TOO_HIGH_ELEVATION  # blue
-    elif label == 3:
-        return TOO_TILTED  # red
+        return TOO_TILTED  
     else:
         return 0.0  # for safety, in case an unexpected label value appears
+
 
 
 def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, sector_size, min_range):
@@ -146,7 +146,7 @@ def set_polygons(cloud_msg, zone_idx, r_idx, theta_idx, num_split, ring_size, se
     polygon_stamped.header = cloud_msg.header
 
     # Set point of polygon. Start from RL and ccw
-    MARKER_Z_VALUE = -1.0 # You can modify this value
+    MARKER_Z_VALUE = -2.0 # You can modify this value
 
     # RL
     zone_min_range = min_range[zone_idx]
@@ -257,19 +257,112 @@ def angle_with_z_axis(vector):
     vector = vector / np.linalg.norm(vector)
     return np.arccos(np.dot(vector, [0, 0, -1]))
 
+### image processing ###
+
+def apply_gabor_filter(image, angle):
+    ksize = 15
+    sigma = 5
+    lambd = 3
+    gamma = 0.5
+    psi = 0  # phase offset
+    theta = angle * np.pi / 8
+
+    gabor_filter = cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi)
+    
+    filtered_image = cv2.filter2D(image, cv2.CV_8UC3, gabor_filter)
+
+    # 임계값 설정 및 스트라이프 영역 검출
+    threshold = np.max(filtered_image) * 0.9
+    stripe_regions = filtered_image > threshold
+    stripe_image = np.uint8(stripe_regions * 255)
+
+    return stripe_image
+    # return filtered_image
+
+def count_stripes(image, min_length=5):
+    contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    count = 0
+    for contour in contours:
+        length = cv2.arcLength(contour, True) # 외곽선의 길이 계산
+        if length > min_length: # 길이가 임계값보다 크면 카운트
+            count += 1
+    return count
+
+def extract_features(image, image_sector_index, images_to_cluster, labels, max_stripes_list):
+    max_stripes = 0
+    best_image = None
+
+    for angle in range(8):
+        filtered_image = apply_gabor_filter(image, angle)
+        num_stripes = count_stripes(filtered_image)
+        if num_stripes > max_stripes:
+            max_stripes = num_stripes
+            best_image = filtered_image
+
+    if best_image is not None:
+        # print(max_stripes)
+        
+        images_to_cluster.append(best_image.flatten())
+        labels.append(image_sector_index)
+        max_stripes_list.append(max_stripes)
+    else :
+        best_image = np.zeros((15, 15), dtype=np.uint8)
+        images_to_cluster.append(best_image.flatten())
+        labels.append(image_sector_index)
+        max_stripes_list.append(max_stripes)
+
+def remove_specific_pattern(image, threshold):
+    # 패딩 추가 (상, 하, 좌, 우 1픽셀씩)
+    padded_image = np.pad(image, pad_width=1, mode='constant', constant_values=0)
+
+    # 원래 이미지와 패딩된 이미지의 차이 계산 (상하좌우)
+    diff_up = padded_image[:-2, 1:-1] - padded_image[1:-1, 1:-1]
+    diff_down = padded_image[2:, 1:-1] - padded_image[1:-1, 1:-1]
+    diff_left = padded_image[1:-1, :-2] - padded_image[1:-1, 1:-1]
+    diff_right = padded_image[1:-1, 2:] - padded_image[1:-1, 1:-1]
+
+    # 조건에 맞는 픽셀 찾기 (상하좌우 차이가 모두 threshold보다 큰 경우)
+    condition = (diff_up > threshold) & (diff_down > threshold) & (diff_left > threshold) & (diff_right > threshold)
+
+    # 조건에 맞는 픽셀을 0으로 설정
+    result_image = np.copy(image)
+    result_image[condition] = 0
+
+    return result_image
+
+def analyze_cluster(labels, cluster_label, max_stripes_list):
+    cluster_stripes = [stripe for idx, stripe in enumerate(max_stripes_list) if labels[idx] == cluster_label]
+    if cluster_stripes:
+        mean_stripe_count = np.mean(cluster_stripes)
+    else:
+        mean_stripe_count = 0
+    return mean_stripe_count
+
 ### callback function ###
 
 def cloud_cb(cloud_msg):
 
     cloud = pc2.read_points(cloud_msg, field_names=("x", "y", "z", "intensity"), skip_nans=True)
-    # czm = [Zone() for _ in range(4*16)] # for 4 rings and 16 sectors
-    # czm = [[[Zone() for _ in range(sector_const)] for _ in range(4)] for _ in range(4)]
     czm = [[
         [Zone() for _ in range(num_sectors_each_zone[zone_idx])]
         for _ in range(num_rings_each_zone[zone_idx])
     ] for zone_idx in range(num_zones)]
-    # czm = np.random.rand(num_zones, num_rings, num_sectors, 5)
 
+    all_points = []
+    traversable_points = []
+    ring_max_points_counts = []
+    marker_id = 0
+
+    images = []
+    image_sector_indices = []
+
+    images_to_cluster = []
+    labels = []
+    max_stripes_list = []
+
+    sector_cluster_mapping = {}
+    cluster_stripe_counts = {}
 
     for pt in cloud:
         x, y, z, intensity = pt
@@ -299,54 +392,6 @@ def cloud_cb(cloud_msg):
                 sector_idx = min(int(theta / sector_sizes_[3]), num_sectors_each_zone[3]-1)
                 czm[zone_idx][ring_idx][sector_idx].points.append([x, y, z, intensity, layer_colors[3]])
 
-    all_points = []
-    traversable_points = []
-    ring_max_points_counts = []
-    marker_id = 0
-
-    for layer in czm:
-        for ring in layer:
-            for sector in ring:
-                if len(sector.points) > MIN_POINTS:
-                    all_points.extend(sector.points)
-                    # sector_points_counts.append(len(sector.points))
-
-    # print("Sector points counts:")
-    # print(sector_points_counts)
-
-
-    # for layer in czm:
-    #     for ring in layer:
-    #         max_points_in_ring = max((len(sector.points) for sector in ring if len(sector.points) > MIN_POINTS), default=0)
-    #         ring_max_points_counts.append(max_points_in_ring)
-
-
-    # Now calculate the mean and variance of the array
-    ring_max_points_counts = np.array(ring_max_points_counts)
-    non_zero_ring_max_points_counts = ring_max_points_counts[ring_max_points_counts != 0]
-
-    # 이제 non_zero_ring_max_points_counts에는 0을 제외한 값들만 있습니다.
-    average = np.mean(non_zero_ring_max_points_counts)
-    std_dev = np.std(non_zero_ring_max_points_counts)
-
-    # print(non_zero_ring_max_points_counts)
-    # print("Mean of maximum points in each ring: ", average)
-    # print("Standard deviation of maximum points in each ring: ", std_dev)
-
-    # sector_points_counts = np.array(sector_points_counts)
-    # mean = np.mean(sector_points_counts)
-    # std_dev = np.std(sector_points_counts)
-    # min_val = np.min(sector_points_counts)
-    # max_val = np.max(sector_points_counts)
-
-    # print("Mean of sector points counts: ", mean)
-    # print("Standard deviation of sector points counts: ", std_dev)
-    # print("Minimum of sector points counts: ", min_val)
-    # print("Maximum of sector points counts: ", max_val)
-
-    z_values = [pt[2] for pt in all_points]
-    min_z = min(z_values)
-    max_z = max(z_values)
 
     # Prepare PolygonArray message
     polygon_msg = PolygonArray()
@@ -355,7 +400,6 @@ def cloud_cb(cloud_msg):
     traversable_polygon_msg = PolygonArray()
     traversable_polygon_msg.header = cloud_msg.header
 
-    images = []
 
     img_dim = 15 # The dimension (in pixels) of your output images
     for zone_idx, layer in enumerate(czm):
@@ -363,6 +407,7 @@ def cloud_cb(cloud_msg):
             for sector_idx, sector in enumerate(ring):
                 if len(sector.points) > MIN_POINTS:
                     #normal vector  
+                    all_points.extend(sector.points)
                     points = np.array([pt[:3] for pt in sector.points])  # Use only the x, y, z coordinates
                     normal_vector = calculate_normal_vector(points)
 
@@ -395,10 +440,10 @@ def cloud_cb(cloud_msg):
                         # This is a traversable sector, publish its points and polygon
                         traversable_points.extend(sector.points)
 
-                        traversable_polygon_stamped = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_)
-                        traversable_polygon_msg.polygons.append(traversable_polygon_stamped)
-                        traversable_poly_pub.publish(traversable_polygon_msg)
-                        traversable_poly_marker_pub.publish(marker)
+                        # traversable_polygon_stamped = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_)
+                        # traversable_polygon_msg.polygons.append(traversable_polygon_stamped)
+                        # traversable_poly_pub.publish(traversable_polygon_msg)
+                        # traversable_poly_marker_pub.publish(marker)
 
                         #heightmap
                         image = np.zeros((img_dim, img_dim), dtype=np.uint8)
@@ -410,7 +455,7 @@ def cloud_cb(cloud_msg):
                         
                         min_x, max_x = min(x_values), max(x_values)
                         min_y, max_y = min(y_values), max(y_values)
-                        # min_z, max_z = min(z_values), max(z_values)
+                        min_z, max_z = min(z_values), max(z_values)
 
                         for pt in sector.points:
                             normalized_x = int((pt[0] - min_x) / (max_x - min_x) * (img_dim - 1))
@@ -420,41 +465,49 @@ def cloud_cb(cloud_msg):
                             image[normalized_y, normalized_x] = normalized_z
 
                         # cv2.imwrite('heightmaps_30/layer{}_ring{}_sector{}.png'.format(zone_idx, ring_idx, sector_idx), image)
+                        image_2d = image.reshape(img_dim, img_dim)
+                        image_2d = remove_specific_pattern(image_2d,15)
 
-                        image = np.array(image).flatten()
-                        images.append(image)
+                        images.append(image_2d)
+                        image_sector_indices.append((zone_idx, ring_idx, sector_idx)) # 해당 이미지의 sector 인덱스 추가
+
                         # Store the image vector
-                        image_vector = image.reshape(-1, 1)
+                        image_vector = image_2d.reshape(-1, 1)
                         all_image_vectors.append(image_vector)
-   
 
-    # Once all images have been processed, perform clustering
-    scaler = StandardScaler()
-    images = scaler.fit_transform(images)
-    # all_image_vectors_scaled = scaler.fit_transform(np.concatenate(all_image_vectors))
 
-    # kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(all_image_vectors_scaled)
-    kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=0).fit(images)
+    for img, sector_index in zip(images, image_sector_indices):
+        extract_features(img, sector_index, images_to_cluster, labels, max_stripes_list)
+
+    kmeans = KMeans(n_clusters=N_CLUSTERS).fit(np.array(max_stripes_list).reshape(-1, 1))
     all_labels = kmeans.labels_
-    # print(all_labels)
-    # print(len(all_labels))
+    print(all_labels)
 
-    cluster_to_avg_direction = {}
-    flag = 0
+    for i in range(N_CLUSTERS):
+        cluster_stripe_counts = {i: analyze_cluster(kmeans.labels_, i, max_stripes_list) for i in range(N_CLUSTERS)}
+
+    # Sort clusters by mean stripe count
+    sorted_clusters = sorted(cluster_stripe_counts.items(), key=lambda x: x[1], reverse=True)
+    print(sorted_clusters)
+
+    # Mapping according to the sorted_clusters order
+    label_mapping = {sorted_clusters[i][0]: i for i in range(len(sorted_clusters))}
+
+    # Apply the mapping to all_labels
+    mapped_labels = [label_mapping[label] for label in all_labels]
+
 
     # Iterate over the zones, rings, and sectors again to assign the labels
     label_idx = 0
     for zone_idx, layer in enumerate(czm):
         for ring_idx, ring in enumerate(layer):
             for sector_idx, sector in enumerate(ring):
-                # if flag == 0:
                 if len(sector.points) > MIN_POINTS:
                     #normal vector  
                     points = np.array([pt[:3] for pt in sector.points])  # Use only the x, y, z coordinates
                     normal_vector = calculate_normal_vector(points)
                     if angle_with_z_axis(normal_vector) >= 1.1 and angle_with_z_axis(normal_vector) <= 1.9:
-                        # flag = 1
-                        cluster_label = all_labels[label_idx]
+                        cluster_label = mapped_labels[label_idx]
 
                         #polygon 
                         polygon_stamped = set_polygons(cloud_msg, zone_idx, ring_idx, sector_idx, 10, ring_sizes_, sector_sizes_, min_ranges_)
@@ -462,19 +515,10 @@ def cloud_cb(cloud_msg):
 
                         # Add likelihood to the polygon label
                         polygon_msg.likelihood.append(get_likelihood_for_label(cluster_label))
-
-                        # sector.points = [[pt[0], pt[1], pt[2], cluster_colors[cluster_label]] for pt in sector.points]
                         label_idx += 1
                     
-                        
-
-
-    # print("The length of Cluster_label : "+len(cluster_label))
-    # print("The length of label_idx : "+len(label_idx))
-
-
-
     poly_pub.publish(polygon_msg)
+    # traversable_poly_pub.publish(polygon_msg)
 
     if all_points:
         output = pc2.create_cloud(cloud_msg.header, fields, [(pt[0], pt[1], pt[2], rgb_to_float(pt[4])) for pt in all_points])
