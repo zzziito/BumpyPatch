@@ -21,7 +21,6 @@ Outdoor Off-road Mobile Robot, LiDAR, Point Cloud Processing, Traversable Ground
     * Applicate the classification model to each patch (model_application.py)
     * Evaluate final class for each patch 
     * Colorize point cloud based on the final classes (pc_colorize.py)
-  * in case of <b>Depth map Evaluation</b> : 
   * 
   * 
 2. Media 
