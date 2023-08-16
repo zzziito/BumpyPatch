@@ -1,8 +1,8 @@
-# BumpiPatch
+# BumpyPatch
 
 evaluate terrain <b>Bumpi</b>ness by heightmap <b>Patch</b>
 
-## About BumpiPatch
+## About BumpyPatch
 
 Unlinke indoors where the driving environment is predictable, mobile robots might encounter various road conditions when it is driving outdoors. Mobile robots, which often carry sensitive equipment on their chassis or carry beverages (in the case of delivery robots) need to decide where is the stable road even within areas classsified as "traversable area". 
 Therefore, by analyzing the correlation between IMU , which can digitalize the moveness of the chassis and heightmap of the road, the goal was to evaluate the driving stability by predicting "less bumpy roads" in advance. 
@@ -32,6 +32,13 @@ Outdoor Off-road Mobile Robot, LiDAR, Point Cloud Processing, Traversable Ground
 
 ### 1. Static Scene :
 
+run.py executes all the necessary code. Just change the content of *original_pcd* to your desired file.
+
+```
+python3 run.py
+```
+
+When you run this file, a folder containing cropped images, a CSV file, and a recolorized pcd file will be generated. This make take a few minutes...
 
 
 ### 2. Dynamic Scene :
@@ -54,7 +61,15 @@ cd .. && catkin_make
 source devel/setup.bash
 rosrun bumpypatch bumpypatch_node.py
 ```
-- 
+- Topics of BumpyPatch and how to visualize them
+    - output (sensor_msgs/PointCloud2) : 
+    - polygons (jsk_recognition_msgs/PolygonArray) :
+    - normal_vector_marker (visualization_msgs::Marker) :
+
+```
+
+```
+
 
 
 ## Software Requirements
