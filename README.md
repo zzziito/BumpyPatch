@@ -40,6 +40,9 @@ python3 run.py
 
 When you run this file, a folder containing cropped images, a CSV file, and a recolorized pcd file will be generated. This make take a few minutes...
 
+- Dataset
+    - PCD file that has been used in the research was downloaded from [AgEagle Dataset](https://ageagle.com/data-set/gravel-quarry/)
+
 
 ### 2. Dynamic Scene :
 
@@ -55,8 +58,11 @@ cd ~/catkin_ws/src
 git clone -b final https://github.com/zzziito/BumpyPatch.git
 cd .. && catkin_make
 ```
+- Prepare the dataset
+    - RELLIS-3D
+    - 
 
-- run bumpypatch_node.py
+- Run bumpypatch_node.py
 ```
 source devel/setup.bash
 rosrun bumpypatch bumpypatch_node.py
@@ -85,3 +91,7 @@ In order to use the provided scripts, these are the list of requirements:
  * OpenCV 4.5.5
 ```
 
+### Contact
+
+If you have any questions, please let me know :
+- Jiwon Park {[overflow21@khu.ac.kr]()}
