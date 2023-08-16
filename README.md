@@ -13,20 +13,6 @@ Outdoor Off-road Mobile Robot, LiDAR, Point Cloud Processing, Traversable Ground
 
 ## Result
 
-## Repository content :
-
-1. source code 
-  * in case of <b>Static Scene</b> : 
-    * Heightmap Generation (pc_to_heightmap_patch.py)
-    * Applicate the classification model to each patch (model_application.py)
-    * Evaluate final class for each patch 
-    * Colorize point cloud based on the final classes (pc_colorize.py)
-  * 
-  * 
-2. Media 
-  * 
-3. Data Files
-
 ## How to use
 
 ### 1. Static Scene :
@@ -75,6 +61,20 @@ rosrun bumpypatch bumpypatch_node.py
 
 ```
 
+
+## Repository content :
+
+1. source code 
+  * in case of <b>Static Scene</b> : 
+    * Heightmap Generation (pc_to_heightmap_patch.py)
+    * Applicate the classification model to each patch (model_application.py)
+    * Evaluate final class for each patch 
+    * Colorize point cloud based on the final classes (pc_colorize.py)
+  * 
+  * 
+2. Media 
+  * 
+3. Data Files
 
 
 ## Software Requirements
