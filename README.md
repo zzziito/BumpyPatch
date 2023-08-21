@@ -13,6 +13,10 @@ Outdoor Off-road Mobile Robot, LiDAR, Point Cloud Processing, Traversable Ground
 
 ## Result
 
+### Static Scene
+
+![](img/final_static.png)
+
 ### Dynamic Scene
 
 ![](img/final_dynamic.gif)
