@@ -13,6 +13,10 @@ Outdoor Off-road Mobile Robot, LiDAR, Point Cloud Processing, Traversable Ground
 
 ## Result
 
+### Dynamic Scene
+
+![](img/final_dynamic.gif)
+
 ## How to use
 
 ### 1. Static Scene :
