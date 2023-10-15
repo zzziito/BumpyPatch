@@ -12,5 +12,5 @@ export LD_LIBRARY_PATH="/home/rtlink/jiwon/bumpypatch_ws/devel/lib:$LD_LIBRARY_P
 export PKG_CONFIG_PATH="/home/rtlink/jiwon/bumpypatch_ws/devel/lib/pkgconfig:$PKG_CONFIG_PATH"
 export PWD='/home/rtlink/jiwon/bumpypatch_ws/build'
 export PYTHONPATH="/home/rtlink/jiwon/bumpypatch_ws/devel/lib/python3/dist-packages:$PYTHONPATH"
-export ROSLISP_PACKAGE_DIRECTORIES='/home/rtlink/jiwon/bumpypatch_ws/devel/share/common-lisp'
+export ROSLISP_PACKAGE_DIRECTORIES="/home/rtlink/jiwon/bumpypatch_ws/devel/share/common-lisp:$ROSLISP_PACKAGE_DIRECTORIES"
 export ROS_PACKAGE_PATH="/home/rtlink/jiwon/bumpypatch_ws/src:$ROS_PACKAGE_PATH"

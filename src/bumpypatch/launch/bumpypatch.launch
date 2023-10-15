@@ -1,0 +1,7 @@
+<launch>
+
+    <node name="bumpypatch_node" pkg="bumpypatch" type="bumpypatch_node.py" output="screen" />
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find bumpypatch)/rviz/bumpypatch.rviz" output="screen" />
+
+</launch>

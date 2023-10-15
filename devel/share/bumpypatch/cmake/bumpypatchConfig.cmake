@@ -67,7 +67,7 @@ set(bumpypatch_CONFIG_INCLUDED TRUE)
 
 # set variables for source/devel/install prefixes
 if("TRUE" STREQUAL "TRUE")
-  set(bumpypatch_SOURCE_PREFIX /home/rtlink/jiwon/bumpypatch_ws/src/dynamic_scene)
+  set(bumpypatch_SOURCE_PREFIX /home/rtlink/jiwon/bumpypatch_ws/src/bumpypatch)
   set(bumpypatch_DEVEL_PREFIX /home/rtlink/jiwon/bumpypatch_ws/devel)
   set(bumpypatch_INSTALL_PREFIX "")
   set(bumpypatch_PREFIX ${bumpypatch_DEVEL_PREFIX})
@@ -110,7 +110,7 @@ if(NOT " " STREQUAL " ")
         message(FATAL_ERROR "Project 'bumpypatch' specifies '${idir}' as an include dir, which is not found.  It does not exist in '${include}'.  ${_report}")
       endif()
     else()
-      message(FATAL_ERROR "Project 'bumpypatch' specifies '${idir}' as an include dir, which is not found.  It does neither exist as an absolute directory nor in '/home/rtlink/jiwon/bumpypatch_ws/src/dynamic_scene/${idir}'.  ${_report}")
+      message(FATAL_ERROR "Project 'bumpypatch' specifies '${idir}' as an include dir, which is not found.  It does neither exist as an absolute directory nor in '/home/rtlink/jiwon/bumpypatch_ws/src/bumpypatch/${idir}'.  ${_report}")
     endif()
     _list_append_unique(bumpypatch_INCLUDE_DIRS ${include})
   endforeach()
@@ -154,7 +154,7 @@ foreach(library ${libraries})
     set(lib_path "")
     set(lib "${library}-NOTFOUND")
     # since the path where the library is found is returned we have to iterate over the paths manually
-    foreach(path /home/rtlink/jiwon/bumpypatch_ws/devel/lib;/opt/ros/noetic/lib)
+    foreach(path /home/rtlink/jiwon/bumpypatch_ws/devel/lib;/home/rtlink/jiwon/paper_ws/devel/lib;/opt/ros/noetic/lib)
       find_library(lib ${library}
         PATHS ${path}
         NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)

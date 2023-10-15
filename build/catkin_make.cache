@@ -1,2 +1,2 @@
-dynamic_scene
+bumpypatch
 -DCATKIN_DEVEL_PREFIX=/home/rtlink/jiwon/bumpypatch_ws/devel -DCMAKE_INSTALL_PREFIX=/home/rtlink/jiwon/bumpypatch_ws/install -G Unix Makefiles

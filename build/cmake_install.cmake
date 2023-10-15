@@ -136,7 +136,7 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
   include("/home/rtlink/jiwon/bumpypatch_ws/build/gtest/cmake_install.cmake")
-  include("/home/rtlink/jiwon/bumpypatch_ws/build/dynamic_scene/cmake_install.cmake")
+  include("/home/rtlink/jiwon/bumpypatch_ws/build/bumpypatch/cmake_install.cmake")
 
 endif()
 
