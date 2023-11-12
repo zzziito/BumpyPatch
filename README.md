@@ -2,6 +2,8 @@
 
 evaluate terrain <b>Bumpi</b>ness by heightmap <b>Patch</b>
 
+Official page of "BumpyPatch : Heightmap-based Point Cloud Segmentation to Find Less Bumpy Road", which is accepted by IEEE International Robotic Computing (IRC) 2023 regular paper. 
+
 ## About BumpyPatch
 
 Unlinke indoors where the driving environment is predictable, mobile robots might encounter various road conditions when it is driving outdoors. Mobile robots, which often carry sensitive equipment on their chassis or carry beverages (in the case of delivery robots) need to decide where is the stable road even within areas classsified as "traversable area". 
